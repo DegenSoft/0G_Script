@@ -55,7 +55,6 @@ class OthersConfig:
 @dataclass
 class WalletInfo:
     account_index: int
-    private_key: str
     address: str
     balance: float
     transactions: int

@@ -2,13 +2,11 @@ import asyncio
 import random
 from loguru import logger
 
-
+import getpass
 import src.utils
-from src.utils.output import show_dev_info, show_logo
 from src.utils.proxy_parser import Proxy
 import src.model
 from src.utils.statistics import print_wallets_stats
-from src.utils.check_github_version import check_version
 from src.utils.logs import ProgressTracker, create_progress_tracker
 
 
@@ -22,16 +20,8 @@ async def start():
                 config,
                 lock,
                 progress_tracker,
+                password
             )
-
-    try:
-        await check_version("0xStarLabs", "StarLabs-0G")
-    except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-        logger.error(f"Failed to check version: {e}")
-        logger.info("Continue with current version\n")
 
     print("\nAvailable options:\n")
     print("[1] ⭐️Start farming")
@@ -64,7 +54,7 @@ async def start():
         return
 
     config = src.utils.get_config()
-
+    password = getpass.getpass("Enter wallets password: ")
     # Load proxies using proxy parser
     try:
         proxy_objects = Proxy.from_file("data/proxies.txt")
@@ -162,7 +152,7 @@ async def start():
 
     await asyncio.gather(*tasks)
 
-    logger.success("Saved accounts and private keys to a file.")
+    logger.success("Saved accounts to a file.")
 
     print_wallets_stats(config)
 
@@ -175,6 +165,7 @@ async def account_flow(
     config: src.utils.config.Config,
     lock: asyncio.Lock,
     progress_tracker: ProgressTracker,
+    password: str
 ):
     try:
         pause = random.randint(
@@ -184,7 +175,7 @@ async def account_flow(
         logger.info(f"[{account_index}] Sleeping for {pause} seconds before start...")
         await asyncio.sleep(pause)
 
-        instance = src.model.Start(account_index, proxy, private_key, config)
+        instance = src.model.Start(account_index, proxy, private_key, config, password)
 
         result = await wrapper(instance.initialize, config)
         if not result:

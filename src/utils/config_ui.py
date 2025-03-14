@@ -28,7 +28,7 @@ class ConfigUI:
         }
 
         self.root = ctk.CTk()
-        self.root.title("StarLabs Configuration")
+        self.root.title("Configuration")
         self.root.geometry("800x600")
         self.root.minsize(800, 600)  # Set minimum window size
         self.root.configure(fg_color=self.colors["bg"])
@@ -40,7 +40,7 @@ class ConfigUI:
         # Header on the left
         header = ctk.CTkLabel(
             header_frame,
-            text="🌟 StarLabs Configuration",
+            text="Configuration",
             font=("Helvetica", 24, "bold"),
             text_color=self.colors["accent"],
             anchor="w",

@@ -4,6 +4,7 @@ import primp
 import random
 import asyncio
 
+from src.degensoft.decryption import decrypt_private_key
 from src.model.projects.domains import conft_app
 from src.model.help.stats import WalletStats
 from src.model.ZeroG import faucet, faucet_tokens, deploy_storage_scan, swaps
@@ -21,10 +22,12 @@ class Start:
         proxy: str,
         private_key: str,
         config: Config,
+        password: str
     ):
         self.account_index = account_index
         self.proxy = proxy
-        self.private_key = private_key
+        self.private_key_enc = private_key
+        self.private_key = decrypt_private_key(private_key, password) if password else private_key
         self.config = config
 
         self.session: primp.AsyncClient | None = None
@@ -62,7 +65,7 @@ class Start:
                 pass
 
             db = Database()
-            tasks = await db.get_wallet_pending_tasks(self.private_key)
+            tasks = await db.get_wallet_pending_tasks(self.private_key_enc)
 
             if not tasks:
                 logger.warning(
@@ -89,7 +92,7 @@ class Start:
 
                 if success:
                     await db.update_task_status(
-                        self.private_key, task_name, "completed"
+                        self.private_key_enc, task_name, "completed"
                     )
                     completed_tasks.append(task_name)
                     await self.sleep(task_name)
@@ -110,7 +113,7 @@ class Start:
             if self.config.SETTINGS.SEND_TELEGRAM_LOGS:
                 message = (
                     f"🤖 0G Bot Report\n\n"
-                    f"💳 Wallet: {self.account_index} | <code>{self.private_key[:6]}...{self.private_key[-4:]}</code>\n\n"
+                    f"💳 Wallet: {self.account_index} | <code>{self.private_key_enc[:6]}...{self.private_key_enc[-4:]}</code>\n\n"
                 )
 
                 if completed_tasks:
@@ -148,7 +151,7 @@ class Start:
                 error_message = (
                     f"⚠️ Error Report\n\n"
                     f"Account #{self.account_index}\n"
-                    f"Wallet: <code>{self.private_key[:6]}...{self.private_key[-4:]}</code>\n"
+                    f"Wallet: <code>{self.private_key_enc[:6]}...{self.private_key_enc[-4:]}</code>\n"
                     f"Error: {str(e)}"
                 )
                 await send_telegram_message(self.config, error_message)
