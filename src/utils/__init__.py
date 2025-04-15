@@ -14,7 +14,6 @@ __all__ = [
     "read_config",
     "read_txt_file",
     "read_private_keys",
-    "ConfigUI",
     "Proxy",
     "run",
     "get_config",
