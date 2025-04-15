@@ -2,7 +2,7 @@ import asyncio
 import random
 from loguru import logger
 from eth_account import Account
-from src.model.help.captcha import NoCaptcha
+from src.model.help.captcha import NoCaptcha, Solvium
 from src.model.onchain.web3_custom import Web3Custom
 import primp
 
@@ -38,21 +38,41 @@ async def faucet(
     web3: Web3Custom,
     config: Config,
     wallet: Account,
+    proxy: str,
 ):
     try:
         logger.info(f"{account_index} | Starting faucet...")
 
-        nocaptcha_client = NoCaptcha(config.CAPTCHA.NOCAPTCHA_API_KEY, session=session)
-        result = await nocaptcha_client.solve_hcaptcha(
-            sitekey="1230eb62-f50c-4da4-a736-da5c3c342e8e",
-            referer="https://hub.0g.ai",
-            invisible=False,
-        )
+        if config.CAPTCHA.USE_NOCAPTCHA:
+            logger.info(
+                f"[{account_index}] | Solving hCaptcha challenge with NoCaptcha..."
+            )
+            nocaptcha_client = NoCaptcha(config.CAPTCHA.NOCAPTCHA_API_KEY, session=session)
+            result = await nocaptcha_client.solve_hcaptcha(
+                sitekey="1230eb62-f50c-4da4-a736-da5c3c342e8e",
+                referer="https://hub.0g.ai",
+                invisible=False,
+            )
+            captcha_token = result["generated_pass_UUID"]
 
-        if result is None:
+        else:
+            logger.info(
+                f"[{account_index}] | Solving hCaptcha challenge with Solvium..."
+            )
+            solvium = Solvium(
+                api_key=config.CAPTCHA.SOLVIUM_API_KEY,
+                session=session,
+                proxy=proxy,
+            )
+
+            captcha_token = await solvium.solve_captcha(
+                sitekey="1230eb62-f50c-4da4-a736-da5c3c342e8e",
+                pageurl="https://hub.0g.ai",
+            )
+    
+        if captcha_token is None:
             raise Exception("Captcha not solved")
 
-        captcha_token = result["generated_pass_UUID"]
         logger.success(f"{account_index} | Captcha solved for faucet")
 
         headers = {
@@ -74,8 +94,17 @@ async def faucet(
         json_data = {
             "address": wallet.address,
             "hcaptchaToken": captcha_token,
-            "token": "A0GI",
+            'token': {
+                'name': 'A0GI',
+                'symbol': 'A0GI',
+                'logoUrl': 'https://s3.ap-northeast-2.amazonaws.com/upload.xangle.io/images/project/676ce0a44b1980a54df08249/64.png',
+                'chainId': 16600,
+                'address': '',
+                'decimals': 18,
+                'bridgeInfo': [],
+            },
         }
+
 
         response = await session.post(
             "https://992dkn4ph6.execute-api.us-west-1.amazonaws.com/",
@@ -149,7 +178,7 @@ async def mint_token(
         tx_params = {
             "from": wallet.address,
             "value": 0,
-            "nonce": await web3.web3.eth.get_transaction_count(wallet.address),
+            "nonce": await web3.web3.eth.get_transaction_count(wallet.address, 'pending'),
             "chainId": CHAIN_ID,
             **gas_params,
         }
@@ -193,6 +222,7 @@ async def mint_token(
         raise
 
 
+@retry_async(default_value=False)
 async def faucet_tokens(
     account_index: int,
     web3: Web3Custom,
@@ -212,39 +242,44 @@ async def faucet_tokens(
             return False
 
         for token_name in FAUCET_CONTRACTS.keys():
-            success = await mint_token(
-                account_index,
-                web3,
-                wallet,
-                token_name,
-                FAUCET_CONTRACTS[token_name],
-                config,
-            )
-            if not success:
-                logger.error(f"{account_index} | Failed to mint {token_name}")
-            else:
-                success_minted += 1
+            try:
+                success = await mint_token(
+                    account_index,
+                    web3,
+                    wallet,
+                    token_name,
+                    FAUCET_CONTRACTS[token_name],
+                    config,
+                )
+                if success:
+                    success_minted += 1
+                    logger.success(
+                        f"{account_index} | Successfully minted {token_name}"
+                    )
+                else:
+                    logger.error(f"{account_index} | Failed to mint {token_name}")
+            except Exception as e:
+                # Продолжаем с другими токенами даже если этот не удался
+                logger.error(f"{account_index} | Error minting {token_name}: {str(e)}")
+                continue
+            finally:
+                # Add delay between mints regardless of success
+                random_pause = random.randint(
+                    config.SETTINGS.PAUSE_BETWEEN_SWAPS[0],
+                    config.SETTINGS.PAUSE_BETWEEN_SWAPS[1],
+                )
+                logger.info(
+                    f"{account_index} | Sleeping {random_pause} seconds after attempting {token_name}..."
+                )
+                await asyncio.sleep(random_pause)
 
-            # Add delay between mints
-            random_pause = random.randint(
-                config.SETTINGS.PAUSE_BETWEEN_SWAPS[0],
-                config.SETTINGS.PAUSE_BETWEEN_SWAPS[1],
-            )
-            logger.info(
-                f"{account_index} | Sleeping {random_pause} seconds after minting {token_name}..."
-            )
-            await asyncio.sleep(random_pause)
-
-        if success_minted >= 2:
+        if success_minted >= 1:
             logger.success(
-                f"{account_index} | Successfully minted {success_minted} tokens"
+                f"{account_index} | Successfully minted {success_minted} out of {len(FAUCET_CONTRACTS)} tokens"
             )
             return True
-
         else:
-            logger.error(
-                f"{account_index} | Failed to mint 2 tokens. Sleeping {random_pause} seconds..."
-            )
+            logger.error(f"{account_index} | Failed to mint any tokens.")
             return False
 
     except Exception as e:

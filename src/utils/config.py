@@ -37,14 +37,20 @@ class Hub0gSwapsConfig:
 
 @dataclass
 class CaptchaConfig:
+    SOLVIUM_API_KEY: str
     NOCAPTCHA_API_KEY: str
-
+    USE_NOCAPTCHA: bool
 
 @dataclass
 class RpcsConfig:
-    ARBITRUM: List[str]
     ZEROG: List[str]
 
+
+@dataclass
+class PuzzlemaniaConfig:
+    USE_REFERRAL_CODE: bool
+    INVITES_PER_REFERRAL_CODE: Tuple[int, int]
+    COLLECT_REFERRAL_CODE: bool
 
 @dataclass
 class OthersConfig:
@@ -73,6 +79,7 @@ class Config:
     CAPTCHA: CaptchaConfig
     RPCS: RpcsConfig
     OTHERS: OthersConfig
+    PUZZLEMANIA: PuzzlemaniaConfig
     WALLETS: WalletsConfig = field(default_factory=WalletsConfig)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -135,15 +142,23 @@ class Config:
                 NUMBER_OF_SWAPS=tuple(data["HUB_0G_SWAPS"]["NUMBER_OF_SWAPS"]),
             ),
             CAPTCHA=CaptchaConfig(
+                SOLVIUM_API_KEY=data["CAPTCHA"]["SOLVIUM_API_KEY"],
                 NOCAPTCHA_API_KEY=data["CAPTCHA"]["NOCAPTCHA_API_KEY"],
+                USE_NOCAPTCHA=data["CAPTCHA"]["USE_NOCAPTCHA"],
             ),
             RPCS=RpcsConfig(
-                ARBITRUM=data["RPCS"]["ARBITRUM"],
                 ZEROG=data["RPCS"]["ZEROG"],
             ),
             OTHERS=OthersConfig(
                 SKIP_SSL_VERIFICATION=data["OTHERS"]["SKIP_SSL_VERIFICATION"],
                 USE_PROXY_FOR_RPC=data["OTHERS"]["USE_PROXY_FOR_RPC"],
+            ),
+            PUZZLEMANIA=PuzzlemaniaConfig(
+                USE_REFERRAL_CODE=data["PUZZLEMANIA"]["USE_REFERRAL_CODE"],
+                INVITES_PER_REFERRAL_CODE=tuple(
+                    data["PUZZLEMANIA"]["INVITES_PER_REFERRAL_CODE"]
+                ),
+                COLLECT_REFERRAL_CODE=data["PUZZLEMANIA"]["COLLECT_REFERRAL_CODE"],
             ),
         )
 

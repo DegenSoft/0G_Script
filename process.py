@@ -8,10 +8,10 @@ from src.utils.proxy_parser import Proxy
 import src.model
 from src.utils.statistics import print_wallets_stats
 from src.utils.logs import ProgressTracker, create_progress_tracker
-
+from src.utils.config_browser import run
 
 async def start():
-    async def launch_wrapper(index, proxy, private_key):
+    async def launch_wrapper(index, proxy, private_key, twitter_token):
         async with semaphore:
             await account_flow(
                 index,
@@ -20,11 +20,12 @@ async def start():
                 config,
                 lock,
                 progress_tracker,
-                password
+                password,
+                twitter_token,
             )
 
     print("\nAvailable options:\n")
-    print("[1] ⭐️Start farming")
+    print("[1] ⭐️ Start farming")
     print("[2] 🔧 Edit config")
     print("[3] 💾 Database actions")
     print("[4] 👋 Exit")
@@ -39,8 +40,7 @@ async def start():
     if choice == "4" or not choice:
         return
     elif choice == "2":
-        config_ui = src.utils.ConfigUI()
-        config_ui.run()
+        run()
         return
     elif choice == "1":
         pass
@@ -67,6 +67,15 @@ async def start():
         return
 
     private_keys = src.utils.read_private_keys("data/private_keys.txt")
+    
+
+    if "PUZZLEMANIA" in config.FLOW.TASKS:
+        twitter_tokens = src.utils.read_txt_file("twitter tokens", "data/twitter_tokens.txt")
+        if len(twitter_tokens) < len(private_keys):
+            logger.error(f"Not enough twitter tokens. Twitter tokens: {len(twitter_tokens)} < Private keys: {len(private_keys)}")
+            return
+    else:
+        twitter_tokens = [""] * len(private_keys)
 
     # Определяем диапазон аккаунтов
     start_index = config.SETTINGS.ACCOUNTS_RANGE[0]
@@ -146,6 +155,7 @@ async def start():
                     actual_index,
                     cycled_proxies[idx],
                     accounts_to_process[idx],
+                    twitter_tokens[idx],
                 )
             )
         )
@@ -158,6 +168,7 @@ async def start():
 
     input("Press Enter to continue...")
 
+
 async def account_flow(
     account_index: int,
     proxy: str,
@@ -165,7 +176,8 @@ async def account_flow(
     config: src.utils.config.Config,
     lock: asyncio.Lock,
     progress_tracker: ProgressTracker,
-    password: str
+    password: str,
+    twitter_token: str,
 ):
     try:
         pause = random.randint(
@@ -175,7 +187,7 @@ async def account_flow(
         logger.info(f"[{account_index}] Sleeping for {pause} seconds before start...")
         await asyncio.sleep(pause)
 
-        instance = src.model.Start(account_index, proxy, private_key, config, password)
+        instance = src.model.Start(account_index, proxy, private_key, config, password, twitter_token)
 
         result = await wrapper(instance.initialize, config)
         if not result:

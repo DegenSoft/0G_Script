@@ -1,17 +1,35 @@
 TASKS = ["FAUCET"]
 
+PUZZLEMANIA = ["puzzlemania"]
 
 FULL_TASK = [
     "FAUCET",
     "FAUCET_TOKENS",
     "SWAPS",
     "STORAGESCAN_DEPLOY",
-    "CONFT_APP",
+    "CONFT_MINT",
+    "MINTAIR_DEPLOY",
+    "MINT_PANDA_0G",
+    "MINT_NERZO_0GOG",
 ]
 
 ONLY_SWAPS = [
     "STORAGESCAN_DEPLOY",
-    "CONFT_APP",
+    "CONFT_MINT",
+    "SWAPS",
+]
+
+EVERY_DAY = [
+    "FAUCET",
+    "FAUCET_TOKENS",
+    ["SWAPS", "SKIP"],
+    (
+        "MINT_PANDA_0G",
+        "MINT_NERZO_0GOG",
+        "STORAGESCAN_DEPLOY",
+        "CONFT_MINT",
+        "MINTAIR_DEPLOY",
+    ),
     "SWAPS",
 ]
 
@@ -19,8 +37,11 @@ FAUCET = ["faucet"]
 SWAPS = ["swaps"]
 FAUCET_TOKENS = ["faucet_tokens"]
 STORAGESCAN_DEPLOY = ["storagescan_deploy"]
-CONFT_APP = ["conft_mint"]
-
+CONFT_MINT = ["conft_mint"]
+MINT_PANDA_0G = ["mint_panda_0g"]
+MINTAIR_DEPLOY = ["mintair_deploy"]
+EASYNODE_DEPLOY = ["easynode_deploy"]
+MEMEBRIDGE_DEPLOY = ["memebridge_deploy"]
 """
 EN:
 You can create your own task with the modules you need 
@@ -73,4 +94,9 @@ faucet_tokens - faucet ETH/BTC/USDT tokens (needs A0GI balance)
 swaps - swaps tokens randomly on 0g hub
 storagescan_deploy - deploy storagescan file
 conft_mint - mint conftApp nft (once per wallet) and mint Domain
+mint_panda_0g - mint panda 0g nft (once per wallet) - https://nerzo.xyz/0gog
+mintair_deploy - deploy contract at https://contracts.mintair.xyz/
+easynode_deploy - deploy contract at https://playground.easy-node.xyz/
+memebridge_deploy - deploy contract at https://www.memebridge.xyz/deploy
+puzzlemania - complete tasks on https://puzzlemania.0g.ai/
 """
