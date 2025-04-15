@@ -81,7 +81,7 @@ class Start:
                         error_message = (
                             f"⚠️ Database error\n\n"
                             f"Account #{self.account_index}\n"
-                            f"Wallet: <code>{self.private_key[:6]}...{self.private_key[-4:]}</code>\n"
+                            f"Wallet: <code>{self.private_key_enc[:6]}...{self.private_key_enc[-4:]}</code>\n"
                             f"Error: Database not created or wallets table not found"
                         )
                         await send_telegram_message(self.config, error_message)
