@@ -208,7 +208,6 @@ class Start:
             
             if task == "faucet":
                 return await faucets(
-                return await faucets(
                     self.account_index,
                     self.session,
                     self.zerog_web3,
