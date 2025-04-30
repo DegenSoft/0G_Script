@@ -387,11 +387,10 @@ class NoCaptcha:
 
 class Solvium:
     def __init__(
-        self, 
-        api_key: str, 
+        self,
+        api_key: str,
         session: AsyncClient,
         proxy: Optional[str] = None,
-
     ):
         self.api_key = api_key
         self.proxy = proxy
@@ -405,13 +404,15 @@ class Solvium:
             return proxy
         return f"http://{proxy}"
 
-    async def create_turnstile_task(self, sitekey: str, pageurl: str) -> Optional[str]:
+    async def create_hcaptcha_task(self, sitekey: str, pageurl: str) -> Optional[str]:
         """Creates a Turnstile captcha solving task"""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
         }
 
-        url = f"{self.base_url}/task/noname?url={pageurl}&sitekey={sitekey}&ref=starlabs"
+        url = (
+            f"{self.base_url}/task/noname?url={pageurl}&sitekey={sitekey}&ref=starlabs"
+        )
 
         # if self.proxy:
         #     formatted_proxy = self._format_proxy(self.proxy)
@@ -420,8 +421,33 @@ class Solvium:
         try:
             response = await self.session.get(url, headers=headers, timeout=30)
             result = response.json()
-            
+
             if result.get("message") == "Task created" and "task_id" in result:
+                return result["task_id"]
+
+            logger.error(f"Error creating Turnstile task with Solvium: {result}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error creating Turnstile task with Solvium: {e}")
+            return None
+
+    async def create_turnstile_task(self, challenge_token: str) -> Optional[str]:
+        """Creates a Turnstile captcha solving task"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+        }
+
+        try:
+            response = await self.session.get(
+                f"{self.base_url}/task/vercel/",
+                params={"challengeToken": challenge_token},
+                headers=headers,
+                timeout=30,
+            )
+            result = response.json()
+
+            if "task_id" in result:
                 return result["task_id"]
 
             logger.error(f"Error creating Turnstile task with Solvium: {result}")
@@ -445,16 +471,23 @@ class Solvium:
                     headers=headers,
                     timeout=30,
                 )
-                
+
                 result = response.json()
 
                 # Проверяем статус задачи
-                if result.get("status") == "completed" and result.get("result") and result["result"].get("solution"):
+                if (
+                    result.get("status") == "completed"
+                    and result.get("result")
+                    and result["result"].get("solution")
+                ):
                     solution = result["result"]["solution"]
-                    
+
                     return solution
-                        
-                elif result.get("status") == "running" or result.get("status") == "pending":
+
+                elif (
+                    result.get("status") == "running"
+                    or result.get("status") == "pending"
+                ):
                     # Задача еще выполняется, ждем
                     await asyncio.sleep(5)
                     continue
@@ -467,13 +500,34 @@ class Solvium:
                 logger.error(f"Error getting result with Solvium: {e}")
                 return None
 
-        logger.error("Max polling attempts reached without getting a result with Solvium")
+        logger.error(
+            "Max polling attempts reached without getting a result with Solvium"
+        )
         return None
 
     async def solve_captcha(self, sitekey: str, pageurl: str) -> Optional[str]:
         """Solves Cloudflare Turnstile captcha and returns token"""
-        task_id = await self.create_turnstile_task(sitekey, pageurl)
+        task_id = await self.create_hcaptcha_task(sitekey, pageurl)
         if not task_id:
             return None
 
         return await self.get_task_result(task_id)
+
+    async def solve_turnstile(self, challenge_token: str) -> Optional[str]:
+        """Solves Cloudflare Turnstile captcha and returns token"""
+        task_id = await self.create_turnstile_task(challenge_token)
+        if not task_id:
+            return None
+
+        return await self.get_task_result(task_id)
+
+    async def solve_vercel_challenge(
+        self, challenge_token: str, site_url: str, session
+    ) -> Optional[str]:
+        """Solves Vercel challenge and returns the cookie value"""
+        # Step 1: Solve the challenge
+        solution = await self.solve_turnstile(challenge_token)
+        if not solution:
+            return None
+
+        return solution

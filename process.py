@@ -10,6 +10,7 @@ from src.utils.statistics import print_wallets_stats
 from src.utils.logs import ProgressTracker, create_progress_tracker
 from src.utils.config_browser import run
 
+
 async def start():
     async def launch_wrapper(index, proxy, private_key, twitter_token):
         async with semaphore:
@@ -67,15 +68,27 @@ async def start():
         return
 
     private_keys = src.utils.read_private_keys("data/private_keys.txt")
-    
 
-    if "PUZZLEMANIA" in config.FLOW.TASKS:
-        twitter_tokens = src.utils.read_txt_file("twitter tokens", "data/twitter_tokens.txt")
-        if len(twitter_tokens) < len(private_keys):
-            logger.error(f"Not enough twitter tokens. Twitter tokens: {len(twitter_tokens)} < Private keys: {len(private_keys)}")
-            return
+    # Read Twitter tokens regardless of tasks
+    twitter_tokens = src.utils.read_txt_file(
+        "twitter tokens", "data/twitter_tokens.txt"
+    )
+
+    # Handle the case when there are more private keys than Twitter tokens
+    if len(twitter_tokens) < len(private_keys):
+        # Pad with empty strings
+        twitter_tokens.extend([""] * (len(private_keys) - len(twitter_tokens)))
+    # Handle the case when there are more Twitter tokens than private keys
+    elif len(twitter_tokens) > len(private_keys):
+        # Store excess Twitter tokens in config
+        config.spare_twitter_tokens = twitter_tokens[len(private_keys) :]
+        twitter_tokens = twitter_tokens[: len(private_keys)]
+        logger.info(
+            f"Stored {len(config.spare_twitter_tokens)} excess Twitter tokens in config.spare_twitter_tokens"
+        )
     else:
-        twitter_tokens = [""] * len(private_keys)
+        # Equal number of tokens and private keys
+        config.spare_twitter_tokens = []
 
     # Определяем диапазон аккаунтов
     start_index = config.SETTINGS.ACCOUNTS_RANGE[0]

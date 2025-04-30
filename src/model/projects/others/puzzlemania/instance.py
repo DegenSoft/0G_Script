@@ -181,7 +181,11 @@ class Puzzlemania:
             if task["title"] in [
                 "Use a friend's referral code",
                 "Refer a friend",
+                "Mint 0G Puzzle Mania Commemorative NFT",
             ]:
+                continue
+
+            if "Farcaster" in task["title"]:
                 continue
 
             records = task["records"]
@@ -196,6 +200,26 @@ class Puzzlemania:
                         f'{self.wallet.address} | Task "{task["title"]}" already completed!'
                     )
                     continue
+
+            task_end_time = task["endDateTimeAt"]
+            if task_end_time:
+                try:
+                    # Parse the end time string to datetime object
+                    end_time = datetime.strptime(
+                        task_end_time, "%Y-%m-%dT%H:%M:%S.%fZ"
+                    ).replace(tzinfo=timezone.utc)
+                    current_time = datetime.now(timezone.utc)
+
+                    # Skip task if end time has already passed
+                    if current_time > end_time:
+                        # logger.info(
+                        #     f"{self.wallet.address} | Task {task['title']} has already ended. Skipping..."
+                        # )
+                        continue
+                except Exception as e:
+                    logger.warning(
+                        f"{self.wallet.address} | Error parsing task end time: {e}. Proceeding with task."
+                    )
 
             status = await self.__do_task(task)
             if not status:
@@ -287,6 +311,8 @@ class Puzzlemania:
             )
 
             # ++++++++++ #
+            if "Request rate limited. Please try again soon." in response.text:
+                raise Exception("Twitter request rate limited. Please try again soon.")
 
             url = response.json()["url"]
             twitter_client = await create_twitter_client(self.proxy, self.twitter_token)
@@ -317,9 +343,69 @@ class Puzzlemania:
             )
 
             if "Could not authenticate you" in response.text:
-                raise Exception(
-                    "twitter token is invalid. Please check your twitter token!"
+                logger.error(
+                    f"{self.wallet.address} | Twitter token is invalid. Please check your twitter token!"
                 )
+                async with self.config.lock:
+                    if (
+                        not self.config.spare_twitter_tokens
+                        or len(self.config.spare_twitter_tokens) == 0
+                    ):
+                        raise Exception(
+                            "Twitter token is invalid and no spare tokens available. Please check your twitter token!"
+                        )
+
+                    # Get a new token from the spare tokens list
+                    new_token = self.config.spare_twitter_tokens.pop(0)
+                    old_token = self.twitter_token
+                    self.twitter_token = new_token
+
+                    # Update the token in the file
+                    try:
+                        with open(
+                            "data/twitter_tokens.txt", "r", encoding="utf-8"
+                        ) as f:
+                            tokens = f.readlines()
+
+                        # Process tokens to replace old with new and remove duplicates
+                        processed_tokens = []
+                        replaced = False
+
+                        for token in tokens:
+                            stripped_token = token.strip()
+
+                            # Skip if it's a duplicate of the new token
+                            if stripped_token == new_token:
+                                continue
+
+                            # Replace old token with new token
+                            if stripped_token == old_token:
+                                if not replaced:
+                                    processed_tokens.append(f"{new_token}\n")
+                                    replaced = True
+                            else:
+                                processed_tokens.append(token)
+
+                        # If we didn't replace anything (old token not found), add new token
+                        if not replaced:
+                            processed_tokens.append(f"{new_token}\n")
+
+                        with open(
+                            "data/twitter_tokens.txt", "w", encoding="utf-8"
+                        ) as f:
+                            f.writelines(processed_tokens)
+
+                        logger.info(
+                            f"{self.wallet.address} | Replaced invalid Twitter token with a new one"
+                        )
+
+                        # Retry the connection with the new token
+                        raise Exception("Trying again with a new token...")
+                    except Exception as file_err:
+                        logger.error(
+                            f"{self.wallet.address} | Failed to update token in file: {file_err}"
+                        )
+                        raise
 
             auth_code = response.json()["auth_code"]
 
@@ -405,10 +491,72 @@ class Puzzlemania:
             )
 
             if response.status_code == 429:
+                raise Exception(f"Rate limit exceeded... Trying again...")
+
+            if "linked_to_another_user" in response.text:
                 logger.error(
-                    f"{self.account_index} | Rate limit exceeded... Please try again later!"
+                    f"{self.wallet.address} | Twitter account is already linked to another user!"
                 )
-                return False
+                async with self.config.lock:
+                    if (
+                        not self.config.spare_twitter_tokens
+                        or len(self.config.spare_twitter_tokens) == 0
+                    ):
+                        raise Exception(
+                            "Twitter token is linked to another user and no spare tokens available. Please check your twitter token!"
+                        )
+
+                    # Get a new token from the spare tokens list
+                    new_token = self.config.spare_twitter_tokens.pop(0)
+                    old_token = self.twitter_token
+                    self.twitter_token = new_token
+
+                    # Update the token in the file
+                    try:
+                        with open(
+                            "data/twitter_tokens.txt", "r", encoding="utf-8"
+                        ) as f:
+                            tokens = f.readlines()
+
+                        # Process tokens to replace old with new and remove duplicates
+                        processed_tokens = []
+                        replaced = False
+
+                        for token in tokens:
+                            stripped_token = token.strip()
+
+                            # Skip if it's a duplicate of the new token
+                            if stripped_token == new_token:
+                                continue
+
+                            # Replace old token with new token
+                            if stripped_token == old_token:
+                                if not replaced:
+                                    processed_tokens.append(f"{new_token}\n")
+                                    replaced = True
+                            else:
+                                processed_tokens.append(token)
+
+                        # If we didn't replace anything (old token not found), add new token
+                        if not replaced:
+                            processed_tokens.append(f"{new_token}\n")
+
+                        with open(
+                            "data/twitter_tokens.txt", "w", encoding="utf-8"
+                        ) as f:
+                            f.writelines(processed_tokens)
+
+                        logger.info(
+                            f"{self.wallet.address} | Replaced Twitter token linked to another user with a new one"
+                        )
+
+                        # Retry the connection with the new token
+                        raise Exception("Trying again with a new token...")
+                    except Exception as file_err:
+                        logger.error(
+                            f"{self.wallet.address} | Failed to update token in file: {file_err}"
+                        )
+                        raise
 
             if response.status_code != 200:
                 raise Exception(f"link request failed: {response.text}")
@@ -566,42 +714,87 @@ class Puzzlemania:
                     else:
                         body = constants.get_verify_activity_json()
 
-                case "Follow Michael Heinrich - CEO, 0G Labs":
-                    body = constants.FOLLOW_MICHAEL_HEINRICH_CEO_0G_LABS
+                # case "Follow Michael Heinrich - CEO, 0G Labs":
+                #     body = constants.FOLLOW_MICHAEL_HEINRICH_CEO_0G_LABS
 
-                case "Follow Ming Wu - CTO, 0G Labs":
-                    body = constants.FOLLOW_MING_WU_CEO_0G_LABS
+                # case "Follow Ming Wu - CTO, 0G Labs":
+                #     body = constants.FOLLOW_MING_WU_CEO_0G_LABS
 
-                case "Follow 0G Foundation":
-                    body = constants.FOLLOW_0G_FOUNDATION
+                # case "Follow 0G Foundation":
+                #     body = constants.FOLLOW_0G_FOUNDATION
 
-                case "Follow 0G Labs":
-                    body = constants.FOLLOW_0G_LABS
+                # case "Follow 0G Labs":
+                #     body = constants.FOLLOW_0G_LABS
 
-                case "Follow One Gravity - the first NFT collection on 0G":
-                    body = constants.FOLLOW_ONE_GRAVITY_THE_FIRST_NFT_COLLECTION_ON_0G
+                # case "Follow One Gravity - the first NFT collection on 0G":
+                #     body = constants.FOLLOW_ONE_GRAVITY_THE_FIRST_NFT_COLLECTION_ON_0G
 
-                case "Follow AI Verse - coming soon.":
-                    body = constants.FOLLOW_AI_VERSE_COMING_SOON
+                # case "Follow AI Verse - coming soon.":
+                #     body = constants.FOLLOW_AI_VERSE_COMING_SOON
 
-                case "Follow Battle of Agents - coming soon.":
-                    body = constants.FOLLOW_BATTLE_OF_AGENTS_COMING_SOON
+                # case "Follow Battle of Agents - coming soon.":
+                #     body = constants.FOLLOW_BATTLE_OF_AGENTS_COMING_SOON
 
-                case "Daily check-in":
-                    body = constants.DAILY_CHECK_IN
+                # case "Daily check-in":
+                #     body = constants.DAILY_CHECK_IN
 
-                case "Like: 600K strong on X!":
-                    body = constants.LIKE_600K_STRONG_ON_X
+                # case "Like: 600K strong on X!":
+                #     body = constants.LIKE_600K_STRONG_ON_X
 
-                case "RT: 600K strong on X!":
-                    body = constants.RT_600K_STRONG_ON_X
-                    
-                case "Follow Ada Heinrich - MD & CMO, 0G Labs":
-                    body = constants.FOLLOW_ADA_HEINRICH_MD_CMO_0G_LABS
-                    
+                # case "RT: 600K strong on X!":
+                #     body = constants.RT_600K_STRONG_ON_X
+
+                # case "Follow Ada Heinrich - MD & CMO, 0G Labs":
+                #     body = constants.FOLLOW_ADA_HEINRICH_MD_CMO_0G_LABS
+
+                # case "Like: 0G in Korea!":
+                #     body = constants.LIKE_0G_IN_KOREA
+
+                # case "RT: 0G in Korea!":
+                #     body = constants.RT_0G_IN_KOREA
+
+                # case "Like: Tech Updates":
+                #     body = constants.LIKE_TECH_UPDATES
+
+                # case "RT: Tech Updates":
+                #     body = constants.RT_TECH_UPDATES
+
+                # case "Like: What's your dream AI battle?":
+                #     body = constants.LIKE_WHAT_S_YOUR_DREAM_AI_BATTLE
+
+                # case "Reply: What's your dream AI battle?":
+                #     body = constants.RT_WHAT_S_YOUR_DREAM_AI_BATTLE
+
+                # case "Like: Early access soon":
+                #     body = constants.LIKE_EARLY_ACCESS_SOON
+
+                # case "RT: Early access soon":
+                #     body = constants.RT_EARLY_ACCESS_SOON
+
+                # case "Like: Learn from Ming":
+                #     body = constants.LIKE_LEARN_FROM_MING
+
+                # case "RT: Learn from Ming":
+                #     body = constants.RT_LEARN_FROM_MING
+
+                # case "Like: 0G Hub":
+                #     body = constants.LIKE_0G_HUB
+
+                # case "RT: 0G Hub":
+                #     body = constants.RT_0G_HUB
+
+                # case "RT: 300K Puzzle Solvers":
+                #     body = constants.RT_300K_PUZZLE_SOLVERS
+
+                # case "Like: 300K Puzzle Solvers":
+                #     body = constants.LIKE_300K_PUZZLE_SOLVERS
+
+                # case "Follow 0G CN!":
+                #     body = constants.FOLLLOW_0G_CN
+
                 case _:
-                    logger.warning(f"{self.wallet.address} | Unknown task: {task_name}")
-                    return True
+                    body = constants.get_verify_activity(task["id"])
+
 
             headers = {
                 "accept": "*/*",
@@ -615,6 +808,10 @@ class Puzzlemania:
             response = await self.session.post(
                 "https://api.deform.cc/", headers=headers, json=body
             )
+
+            if "Activity has already ended" in response.text:
+                logger.info(f"{self.wallet.address} | Task {task_name} already ended!")
+                return True
 
             if (
                 "User has already completed the activity" in response.text
