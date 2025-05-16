@@ -15,7 +15,7 @@ from src.utils.constants import EXPLORER_URL_0G
 
 # NFT Contract Constants
 CONFT_NFT_ADDRESS = "0x9059cA87Ddc891b91e731C57D21809F1A4adC8D9"
-CONFT_CHAIN_ID = 16600
+CONFT_CHAIN_ID = 16601
 CONFT_NFT_ABI = [
     {
         "name": "balanceOf",
@@ -187,6 +187,17 @@ async def mint_nft(
 
 # Domain Contract Constants
 DOMAIN_CONTRACT_ADDRESS = "0xCF7f37B4916AC5c530C863f8c8bB26Ec1e8d2Ccb"
+DOMAIN_CONTRACT_ABI = [
+    {
+        "name": "balanceOf",
+        "type": "function",
+        "inputs": [{"name": "owner", "type": "address", "internalType": "address"}],
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "constant": True,
+        "signature": "0x70a08231",
+        "stateMutability": "view",
+    },
+]
 
 
 @retry_async(default_value=False)
@@ -198,47 +209,19 @@ async def mint_domain(
     wallet: Account,
 ):
     try:
-        domain_for_mint = None
-        for _ in range(10):
-            domain = generate_username()
-            headers = {
-                "accept": "*/*",
-                "accept-language": "en-GB,en-US;q=0.9,en;q=0.8,ru;q=0.7,zh-TW;q=0.6,zh;q=0.5",
-                "priority": "u=1, i",
-                "referer": f"https://conft.app/name-service?name={domain}&blockchain=oglabs_testnet&blockchainId=16600",
-                "sec-ch-ua": '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-origin",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-            }
+        # Create domain contract instance
+        domain_contract = web3.web3.eth.contract(
+            address=web3.web3.to_checksum_address(DOMAIN_CONTRACT_ADDRESS),
+            abi=DOMAIN_CONTRACT_ABI,
+        )
 
-            params = {
-                "name": domain,
-                "blockchain": "oglabs_testnet",
-                "blockchainId": "16600",
-                "_data": "routes/name-service",
-            }
+        # Check if user already has a domain
+        balance = await domain_contract.functions.balanceOf(wallet.address).call()
+        if balance > 0:
+            logger.success(f"{account_index} | Already have Conft.app domain in wallet")
+            return True
 
-            response = await session.get(
-                "https://conft.app/name-service", params=params, headers=headers
-            )
-
-            if response.status_code != 200:
-                raise Exception(f"Failed to get domain info: {response.status_code}")
-
-            is_available = response.json()["selectedBlockchainFromCookie"][
-                "isDomainsAvailable"
-            ]
-            if is_available:
-                domain_for_mint = domain
-                logger.success(f"{account_index} | Domain {domain} is available")
-                break
-
-        if domain_for_mint is None:
-            raise Exception("No available domain found")
+        domain_for_mint = generate_username()
 
         # Encode domain name as bytes
         domain_bytes = domain_for_mint.encode().hex()

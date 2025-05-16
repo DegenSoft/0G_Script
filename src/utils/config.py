@@ -30,21 +30,27 @@ class FlowConfig:
 
 
 @dataclass
-class Hub0gSwapsConfig:
+class ZeroExchangeSwapsConfig:
     BALANCE_PERCENT_TO_SWAP: Tuple[int, int]
     NUMBER_OF_SWAPS: Tuple[int, int]
 
 
 @dataclass
 class CaptchaConfig:
+    SOLVIUM_API_KEY: str
     NOCAPTCHA_API_KEY: str
-
+    USE_NOCAPTCHA: bool
 
 @dataclass
 class RpcsConfig:
-    ARBITRUM: List[str]
     ZEROG: List[str]
 
+
+@dataclass
+class PuzzlemaniaConfig:
+    USE_REFERRAL_CODE: bool
+    INVITES_PER_REFERRAL_CODE: Tuple[int, int]
+    COLLECT_REFERRAL_CODE: bool
 
 @dataclass
 class OthersConfig:
@@ -64,18 +70,53 @@ class WalletInfo:
 class WalletsConfig:
     wallets: List[WalletInfo] = field(default_factory=list)
 
+@dataclass
+class CrustySwapConfig:
+    NETWORKS_TO_REFUEL_FROM: List[str]
+    AMOUNT_TO_REFUEL: Tuple[float, float]
+    MINIMUM_BALANCE_TO_REFUEL: float
+    WAIT_FOR_FUNDS_TO_ARRIVE: bool
+    MAX_WAIT_TIME: int
+    BRIDGE_ALL: bool
+    BRIDGE_ALL_MAX_AMOUNT: float
+
+
+@dataclass
+class WithdrawalConfig:
+    currency: str
+    networks: List[str]
+    min_amount: float
+    max_amount: float
+    wait_for_funds: bool
+    max_wait_time: int
+    retries: int
+    max_balance: float  # Maximum wallet balance to allow withdrawal to
+
+
+@dataclass
+class ExchangesConfig:
+    name: str  # Exchange name (OKX, BINANCE, BYBIT)
+    apiKey: str
+    secretKey: str
+    passphrase: str  # Only needed for OKX
+    withdrawals: List[WithdrawalConfig]
+
 
 @dataclass
 class Config:
     SETTINGS: SettingsConfig
     FLOW: FlowConfig
-    HUB_0G_SWAPS: Hub0gSwapsConfig
+    ZERO_EXCHANGE_SWAPS: ZeroExchangeSwapsConfig
     CAPTCHA: CaptchaConfig
     RPCS: RpcsConfig
     OTHERS: OthersConfig
+    PUZZLEMANIA: PuzzlemaniaConfig
+    CRUSTY_SWAP: CrustySwapConfig
+    EXCHANGES: ExchangesConfig
     WALLETS: WalletsConfig = field(default_factory=WalletsConfig)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-
+    spare_twitter_tokens: List[str] = field(default_factory=list)
+    
     @classmethod
     def load(cls, path: str = "config.yaml") -> "Config":
         """Load configuration from yaml file"""
@@ -128,22 +169,62 @@ class Config:
                 TASKS=tasks_list,
                 SKIP_FAILED_TASKS=data["FLOW"]["SKIP_FAILED_TASKS"],
             ),
-            HUB_0G_SWAPS=Hub0gSwapsConfig(
+            ZERO_EXCHANGE_SWAPS=ZeroExchangeSwapsConfig(
                 BALANCE_PERCENT_TO_SWAP=tuple(
-                    data["HUB_0G_SWAPS"]["BALANCE_PERCENT_TO_SWAP"]
+                    data["ZERO_EXCHANGE_SWAPS"]["BALANCE_PERCENT_TO_SWAP"]
                 ),
-                NUMBER_OF_SWAPS=tuple(data["HUB_0G_SWAPS"]["NUMBER_OF_SWAPS"]),
+                NUMBER_OF_SWAPS=tuple(data["ZERO_EXCHANGE_SWAPS"]["NUMBER_OF_SWAPS"]),
             ),
             CAPTCHA=CaptchaConfig(
+                SOLVIUM_API_KEY=data["CAPTCHA"]["SOLVIUM_API_KEY"],
                 NOCAPTCHA_API_KEY=data["CAPTCHA"]["NOCAPTCHA_API_KEY"],
+                USE_NOCAPTCHA=data["CAPTCHA"]["USE_NOCAPTCHA"],
             ),
             RPCS=RpcsConfig(
-                ARBITRUM=data["RPCS"]["ARBITRUM"],
                 ZEROG=data["RPCS"]["ZEROG"],
             ),
             OTHERS=OthersConfig(
                 SKIP_SSL_VERIFICATION=data["OTHERS"]["SKIP_SSL_VERIFICATION"],
                 USE_PROXY_FOR_RPC=data["OTHERS"]["USE_PROXY_FOR_RPC"],
+            ),
+            PUZZLEMANIA=PuzzlemaniaConfig(
+                USE_REFERRAL_CODE=data["PUZZLEMANIA"]["USE_REFERRAL_CODE"],
+                INVITES_PER_REFERRAL_CODE=tuple(
+                    data["PUZZLEMANIA"]["INVITES_PER_REFERRAL_CODE"]
+                ),
+                COLLECT_REFERRAL_CODE=data["PUZZLEMANIA"]["COLLECT_REFERRAL_CODE"],
+            ),
+            EXCHANGES=ExchangesConfig(
+                name=data["EXCHANGES"]["name"],
+                apiKey=data["EXCHANGES"]["apiKey"],
+                secretKey=data["EXCHANGES"]["secretKey"],
+                passphrase=data["EXCHANGES"]["passphrase"],
+                withdrawals=[
+                    WithdrawalConfig(
+                        currency=w["currency"],
+                        networks=w["networks"],
+                        min_amount=w["min_amount"],
+                        max_amount=w["max_amount"],
+                        wait_for_funds=w["wait_for_funds"],
+                        max_wait_time=w["max_wait_time"],
+                        retries=w["retries"],
+                        max_balance=w["max_balance"],
+                    )
+                    for w in data["EXCHANGES"]["withdrawals"]
+                ],
+            ),
+            CRUSTY_SWAP=CrustySwapConfig(
+                NETWORKS_TO_REFUEL_FROM=data["CRUSTY_SWAP"]["NETWORKS_TO_REFUEL_FROM"],
+                AMOUNT_TO_REFUEL=tuple(data["CRUSTY_SWAP"]["AMOUNT_TO_REFUEL"]),
+                MINIMUM_BALANCE_TO_REFUEL=data["CRUSTY_SWAP"][
+                    "MINIMUM_BALANCE_TO_REFUEL"
+                ],
+                WAIT_FOR_FUNDS_TO_ARRIVE=data["CRUSTY_SWAP"][
+                    "WAIT_FOR_FUNDS_TO_ARRIVE"
+                ],
+                MAX_WAIT_TIME=data["CRUSTY_SWAP"]["MAX_WAIT_TIME"],
+                BRIDGE_ALL=data["CRUSTY_SWAP"]["BRIDGE_ALL"],
+                BRIDGE_ALL_MAX_AMOUNT=data["CRUSTY_SWAP"]["BRIDGE_ALL_MAX_AMOUNT"],
             ),
         )
 

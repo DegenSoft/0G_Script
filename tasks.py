@@ -1,25 +1,18 @@
-TASKS = ["FAUCET"]
+TASKS = ["CRUSTY_SWAP"]
 
-
-FULL_TASK = [
-    "FAUCET",
-    "FAUCET_TOKENS",
-    "SWAPS",
-    "STORAGESCAN_DEPLOY",
-    "CONFT_APP",
+CRUSTY_SWAP = [
+    # "cex_withdrawal",
+    "crusty_refuel",
+    # "crusty_refuel_from_one_to_all",
 ]
 
-ONLY_SWAPS = [
-    "STORAGESCAN_DEPLOY",
-    "CONFT_APP",
-    "SWAPS",
-]
-
+EASYNODE_DEPLOY = ["easynode_deploy"]
 FAUCET = ["faucet"]
-SWAPS = ["swaps"]
 FAUCET_TOKENS = ["faucet_tokens"]
+PUZZLEMANIA = ["puzzlemania"]
 STORAGESCAN_DEPLOY = ["storagescan_deploy"]
-CONFT_APP = ["conft_mint"]
+MINTAIR_DEPLOY = ["mintair_deploy"]
+ZERO_EXCHANGE_SWAPS = ["zero_exchange_swaps"]
 
 """
 EN:
@@ -56,9 +49,9 @@ TASKS = [
 ]
 CREATE_YOUR_OWN_TASK = [
     "faucet",
-    ("faucet_tokens", "swaps"),
-    ["storagescan_deploy", "conft_mint"],
-    "swaps",
+    ("storagescan_deploy", "mintair_deploy"),
+    ["puzzlemania", "easynode_deploy"],
+    "storagescan_deploy",
 ]
 --------------------------------
 
@@ -67,10 +60,14 @@ BELOW ARE THE READY-MADE TASKS THAT YOU CAN USE:
 СНИЗУ ПРИВЕДЕНЫ ГОТОВЫЕ ПРИМЕРЫ ЗАДАЧ, КОТОРЫЕ ВЫ МОЖЕТЕ ИСПОЛЬЗОВАТЬ:
 以下是您可以使用的现成任务：
 
-
-faucet - faucet A0GI tokens (needs captcha)
-faucet_tokens - faucet ETH/BTC/USDT tokens (needs A0GI balance)
-swaps - swaps tokens randomly on 0g hub
+crusty_refuel - refuel MEGAETH at https://www.crustyswap.com/
+crusty_refuel_from_one_to_all - refuel MEGAETH from one to all wallets at https://www.crustyswap.com/
+cex_withdrawal - withdraw ETH from cex exchange (okx, bitget)
+faucet - faucet A0GI tokens (needs captcha and twitter)
 storagescan_deploy - deploy storagescan file
-conft_mint - mint conftApp nft (once per wallet) and mint Domain
+mintair_deploy - deploy contract at https://contracts.mintair.xyz/
+puzzlemania - complete tasks on https://puzzlemania.0g.ai/
+easynode_deploy - deploy easynode contract at https://playground.easy-node.xyz/
+faucet_tokens - faucet ETH/BTC/USDT tokens https://test.zer0.exchange/faucet
+zero_exchange_swaps - swaps tokens on https://test.zer0.exchange/swap
 """

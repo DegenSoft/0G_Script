@@ -8,10 +8,11 @@ from src.utils.proxy_parser import Proxy
 import src.model
 from src.utils.statistics import print_wallets_stats
 from src.utils.logs import ProgressTracker, create_progress_tracker
+from src.utils.config_browser import run
 
 
 async def start():
-    async def launch_wrapper(index, proxy, private_key):
+    async def launch_wrapper(index, proxy, private_key, twitter_token):
         async with semaphore:
             await account_flow(
                 index,
@@ -20,11 +21,12 @@ async def start():
                 config,
                 lock,
                 progress_tracker,
+                twitter_token,
                 password
             )
 
     print("\nAvailable options:\n")
-    print("[1] ⭐️Start farming")
+    print("[1] ⭐️ Start farming")
     print("[2] 🔧 Edit config")
     print("[3] 💾 Database actions")
     print("[4] 👋 Exit")
@@ -39,8 +41,7 @@ async def start():
     if choice == "4" or not choice:
         return
     elif choice == "2":
-        config_ui = src.utils.ConfigUI()
-        config_ui.run()
+        run()
         return
     elif choice == "1":
         pass
@@ -67,6 +68,27 @@ async def start():
         return
 
     private_keys = src.utils.read_private_keys("data/private_keys.txt")
+
+    # Read Twitter tokens regardless of tasks
+    twitter_tokens = src.utils.read_txt_file(
+        "twitter tokens", "data/twitter_tokens.txt"
+    )
+
+    # Handle the case when there are more private keys than Twitter tokens
+    if len(twitter_tokens) < len(private_keys):
+        # Pad with empty strings
+        twitter_tokens.extend([""] * (len(private_keys) - len(twitter_tokens)))
+    # Handle the case when there are more Twitter tokens than private keys
+    elif len(twitter_tokens) > len(private_keys):
+        # Store excess Twitter tokens in config
+        config.spare_twitter_tokens = twitter_tokens[len(private_keys) :]
+        twitter_tokens = twitter_tokens[: len(private_keys)]
+        logger.info(
+            f"Stored {len(config.spare_twitter_tokens)} excess Twitter tokens in config.spare_twitter_tokens"
+        )
+    else:
+        # Equal number of tokens and private keys
+        config.spare_twitter_tokens = []
 
     # Определяем диапазон аккаунтов
     start_index = config.SETTINGS.ACCOUNTS_RANGE[0]
@@ -146,6 +168,7 @@ async def start():
                     actual_index,
                     cycled_proxies[idx],
                     accounts_to_process[idx],
+                    twitter_tokens[idx],
                 )
             )
         )
@@ -158,6 +181,7 @@ async def start():
 
     input("Press Enter to continue...")
 
+
 async def account_flow(
     account_index: int,
     proxy: str,
@@ -165,17 +189,13 @@ async def account_flow(
     config: src.utils.config.Config,
     lock: asyncio.Lock,
     progress_tracker: ProgressTracker,
+    twitter_token: str,
     password: str
 ):
     try:
-        pause = random.randint(
-            config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
-            config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
+        instance = src.model.Start(
+            account_index, proxy, private_key, config, twitter_token, password
         )
-        logger.info(f"[{account_index}] Sleeping for {pause} seconds before start...")
-        await asyncio.sleep(pause)
-
-        instance = src.model.Start(account_index, proxy, private_key, config, password)
 
         result = await wrapper(instance.initialize, config)
         if not result:
@@ -184,13 +204,6 @@ async def account_flow(
         result = await wrapper(instance.flow, config)
         if not result:
             report = True
-
-        pause = random.randint(
-            config.SETTINGS.RANDOM_PAUSE_BETWEEN_ACCOUNTS[0],
-            config.SETTINGS.RANDOM_PAUSE_BETWEEN_ACCOUNTS[1],
-        )
-        logger.info(f"Sleeping for {pause} seconds before next account...")
-        await asyncio.sleep(pause)
 
         # Add progress update
         await progress_tracker.increment(1)

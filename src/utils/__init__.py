@@ -3,8 +3,8 @@ from .reader import read_abi, read_txt_file, read_private_keys
 from .config import get_config
 from .constants import EXPLORER_URL_0G
 from .statistics import print_wallets_stats
-from .config_ui import ConfigUI
 from .proxy_parser import Proxy
+from .config_browser import run
 
 __all__ = [
     "create_client",
@@ -16,6 +16,7 @@ __all__ = [
     "read_private_keys",
     "ConfigUI",
     "Proxy",
+    "run",
     "get_config",
     "EXPLORER_URL_0G",
 ]

@@ -13,84 +13,16 @@ from web3 import Web3 as SyncWeb3
 from eth_abi import abi
 
 from src.utils.constants import EXPLORER_URL_0G
-
-# Router ABI для свапов
-ROUTER_ABI = [
-    {
-        "inputs": [
-            {
-                "components": [
-                    {"internalType": "address", "name": "tokenIn", "type": "address"},
-                    {"internalType": "address", "name": "tokenOut", "type": "address"},
-                    {"internalType": "uint24", "name": "fee", "type": "uint24"},
-                    {"internalType": "address", "name": "recipient", "type": "address"},
-                    {"internalType": "uint256", "name": "deadline", "type": "uint256"},
-                    {"internalType": "uint256", "name": "amountIn", "type": "uint256"},
-                    {
-                        "internalType": "uint256",
-                        "name": "amountOutMinimum",
-                        "type": "uint256",
-                    },
-                    {
-                        "internalType": "uint160",
-                        "name": "sqrtPriceLimitX96",
-                        "type": "uint160",
-                    },
-                ],
-                "internalType": "struct ISwapRouter.ExactInputSingleParams",
-                "name": "params",
-                "type": "tuple",
-            }
-        ],
-        "name": "exactInputSingle",
-        "outputs": [
-            {"internalType": "uint256", "name": "amountOut", "type": "uint256"}
-        ],
-        "stateMutability": "payable",
-        "type": "function",
-    }
-]
-
-# ERC20 ABI для апрувов
-ERC_20_ABI = [
-    {
-        "inputs": [
-            {"internalType": "address", "name": "spender", "type": "address"},
-            {"internalType": "uint256", "name": "amount", "type": "uint256"},
-        ],
-        "name": "approve",
-        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-        "stateMutability": "nonpayable",
-        "type": "function",
-    },
-    {
-        "inputs": [
-            {"internalType": "address", "name": "", "type": "address"},
-            {"internalType": "address", "name": "", "type": "address"},
-        ],
-        "name": "allowance",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function",
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
-        "name": "balanceOf",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function",
-    },
-]
-
-# В начале файла добавим словарь с токенами
-TOKENS = {
-    "USDT": {"address": "0x3eC8A8705bE1D5ca90066b37ba62c4183B024ebf", "decimals": 18},
-    "BTC": {"address": "0x36f6414FF1df609214dDAbA71c84f18bcf00F67d", "decimals": 18},
-    "ETH": {"address": "0x0fE9B43625fA7EdD663aDcEC0728DD635e4AbF7c", "decimals": 18},
-}
+from src.model.projects.swaps.zero_exchange.constants import (
+    TOKENS,
+    ERC_20_ABI,
+    ROUTER_ADDRESS,
+    ROUTER_ABI,
+    MAX_UINT256,
+)
 
 
-async def swaps(
+async def zero_exchange_swaps(
     account_index: int,
     session: primp.AsyncClient,
     web3: Web3Custom,
@@ -130,8 +62,8 @@ async def swaps(
 
         # Определяем количество свапов из конфига
         num_swaps = random.randint(
-            config.HUB_0G_SWAPS.NUMBER_OF_SWAPS[0],
-            config.HUB_0G_SWAPS.NUMBER_OF_SWAPS[1],
+            config.ZERO_EXCHANGE_SWAPS.NUMBER_OF_SWAPS[0],
+            config.ZERO_EXCHANGE_SWAPS.NUMBER_OF_SWAPS[1],
         )
         logger.info(f"{account_index} | Will perform {num_swaps} swaps")
 
@@ -164,8 +96,8 @@ async def swaps(
 
             # Определяем процент баланса для свапа
             swap_percent = random.randint(
-                config.HUB_0G_SWAPS.BALANCE_PERCENT_TO_SWAP[0],
-                config.HUB_0G_SWAPS.BALANCE_PERCENT_TO_SWAP[1],
+                config.ZERO_EXCHANGE_SWAPS.BALANCE_PERCENT_TO_SWAP[0],
+                config.ZERO_EXCHANGE_SWAPS.BALANCE_PERCENT_TO_SWAP[1],
             )
 
             # Рассчитываем сумму для свапа
@@ -266,13 +198,14 @@ async def swap_tokens(
             raise Exception("Native token balance is 0")
 
         # Апрув токена
-        router_address = "0xD86b764618c6E3C078845BE3c3fCe50CE9535Da7"
+        router_address = ROUTER_ADDRESS
         chain_id = await web3.web3.eth.chain_id
 
+        # Используем максимальное значение uint256 для неограниченного апрува
         await web3.approve_token(
             token_address=token_in_address,
             spender_address=router_address,
-            amount=amount_in,
+            amount=MAX_UINT256,  # Unlimited approval
             wallet=wallet,
             chain_id=chain_id,
             token_abi=ERC_20_ABI,

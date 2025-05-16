@@ -5,15 +5,21 @@ import random
 import asyncio
 
 from src.degensoft.decryption import decrypt_private_key
+from src.model.projects.swaps.zero_exchange.instance import zero_exchange_swaps
+from src.model.projects.others.puzzlemania.instance import Puzzlemania
+from src.model.projects.deploy import memebridge_deploy, mintair_deploy, easynode_deploy
+from src.model.projects.mints import mintaura_panda, mint_nerzo_0gog
 from src.model.projects.domains import conft_app
 from src.model.help.stats import WalletStats
-from src.model.ZeroG import faucet, faucet_tokens, deploy_storage_scan, swaps
+from src.model.offchain.cex.instance import CexWithdraw
+from src.model.projects.crustyswap.instance import CrustySwap
+from src.model.ZeroG import faucets, faucet_tokens, deploy_storage_scan, swaps
 from src.model.onchain.web3_custom import Web3Custom
 from src.utils.client import create_client
 from src.utils.config import Config
 from src.model.database.db_manager import Database
 from src.utils.telegram_logger import send_telegram_message
-
+from src.utils.reader import read_private_keys
 
 class Start:
     def __init__(
@@ -22,6 +28,7 @@ class Start:
         proxy: str,
         private_key: str,
         config: Config,
+        twitter_token: str,
         password: str
     ):
         self.account_index = account_index
@@ -29,6 +36,7 @@ class Start:
         self.private_key_enc = private_key
         self.private_key = decrypt_private_key(private_key, password) if password else private_key
         self.config = config
+        self.twitter_token = twitter_token
 
         self.session: primp.AsyncClient | None = None
         self.zerog_web3: Web3Custom | None = None
@@ -65,7 +73,27 @@ class Start:
                 pass
 
             db = Database()
-            tasks = await db.get_wallet_pending_tasks(self.private_key_enc)
+            try:
+                tasks = await db.get_wallet_pending_tasks(self.private_key_enc)
+            except Exception as e:
+                if "no such table: wallets" in str(e):
+                    logger.error(
+                        f"{self.account_index} | Database not created or wallets table not found"
+                    )
+                    if self.config.SETTINGS.SEND_TELEGRAM_LOGS:
+                        error_message = (
+                            f"⚠️ Database error\n\n"
+                            f"Account #{self.account_index}\n"
+                            f"Wallet: <code>{self.private_key_enc[:6]}...{self.private_key_enc[-4:]}</code>\n"
+                            f"Error: Database not created or wallets table not found"
+                        )
+                        await send_telegram_message(self.config, error_message)
+                    return False
+                else:
+                    logger.error(
+                        f"{self.account_index} | Error getting tasks from database: {e}"
+                    )
+                    raise
 
             if not tasks:
                 logger.warning(
@@ -74,6 +102,13 @@ class Start:
                 if self.zerog_web3:
                     await self.zerog_web3.cleanup()
                 return True
+
+            pause = random.randint(
+                self.config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
+                self.config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
+            )
+            logger.info(f"[{self.account_index}] Sleeping for {pause} seconds before start...")
+            await asyncio.sleep(pause)
 
             task_plan_msg = [f"{i+1}. {task['name']}" for i, task in enumerate(tasks)]
             logger.info(
@@ -166,53 +201,174 @@ class Start:
             except Exception as e:
                 logger.error(f"{self.account_index} | Error during cleanup: {e}")
 
+            pause = random.randint(
+                self.config.SETTINGS.RANDOM_PAUSE_BETWEEN_ACCOUNTS[0],
+                self.config.SETTINGS.RANDOM_PAUSE_BETWEEN_ACCOUNTS[1],
+            )
+            logger.info(f"[{self.account_index}] Sleeping for {pause} seconds before next account...")
+            await asyncio.sleep(pause)
+            
     async def execute_task(self, task):
-        """Execute a single task"""
-        task = task.lower()
+        try:
+            """Execute a single task"""
+            task = task.lower()
 
-        if task == "faucet":
-            return await faucet(
-                self.account_index,
-                self.session,
-                self.zerog_web3,
-                self.config,
-                self.wallet,
-            )
+            if task == "skip":
+                return True
+            
+            if task == "faucet":
+                return await faucets(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                    self.proxy,
+                    self.twitter_token,
+                )
 
-        if task == "faucet_tokens":
-            return await faucet_tokens(
-                self.account_index,
-                self.zerog_web3,
-                self.config,
-                self.wallet,
-            )
+            if task == "faucet_tokens":
+                return await faucet_tokens(
+                    self.account_index,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
 
-        if task == "storagescan_deploy":
-            return await deploy_storage_scan(
-                self.account_index,
-                self.session,
-                self.zerog_web3,
-                self.config,
-                self.wallet,
-            )
+            if task == "storagescan_deploy":
+                return await deploy_storage_scan(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
 
-        if task == "conft_mint":
-            return await conft_app(
-                self.account_index,
-                self.session,
-                self.zerog_web3,
-                self.config,
-                self.wallet,
-            )
+            if task == "conft_mint":
+                return await conft_app(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
 
-        if task == "swaps":
-            return await swaps(
-                self.account_index,
-                self.session,
-                self.zerog_web3,
-                self.config,
-                self.wallet,
-            )
+            if task == "swaps":
+                return await swaps(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+
+            if task == "mint_aura":
+                return await mintaura_panda(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+
+            if task == "mint_panda_0g":
+                return await mint_nerzo_0gog(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+
+            if task == "mintair_deploy":
+                return await mintair_deploy(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+
+            if task == "easynode_deploy":
+                return await easynode_deploy(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+
+            if task == "memebridge_deploy":
+                return await memebridge_deploy(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+            if task == "crusty_refuel":
+                crusty_swap = CrustySwap(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                    self.proxy,
+                    self.private_key,
+                )
+                return await crusty_swap.refuel()
+        
+            if task == "crusty_refuel_from_one_to_all":
+                private_keys = read_private_keys("data/private_keys.txt")
+
+                crusty_swap = CrustySwap(
+                    1,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    Account.from_key(private_keys[0]),
+                    self.proxy,
+                    private_keys[0],
+                )
+                private_keys = private_keys[1:]
+                return await crusty_swap.refuel_from_one_to_all(private_keys)
+            
+            if task == "cex_withdrawal":
+                cex_withdrawal = CexWithdraw(
+                    self.account_index,
+                    self.private_key,
+                    self.config,
+                )
+                return await cex_withdrawal.withdraw()
+            
+            if task == "puzzlemania":
+                puzzlemania = Puzzlemania(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                    self.proxy,
+                    self.private_key,
+                    self.twitter_token,
+                )
+                return await puzzlemania.process()
+
+            if task == "zero_exchange_swaps":
+                return await zero_exchange_swaps(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+            
+            logger.error(f"{self.account_index} | Task {task} not found")
+            return False
+
+        except Exception as e:
+            logger.error(f"{self.account_index} | Global error: {e}")
+            return False
 
     async def sleep(self, task_name: str):
         """Делает рандомную паузу между действиями"""

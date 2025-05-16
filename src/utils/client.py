@@ -1,10 +1,13 @@
 import primp
+from noble_tls import Session, Client
 
 
 async def create_client(
-    proxy: str, skip_ssl_verification: bool = True
+    proxy: str, skip_ssl_verification: bool = True, chrome_version: int = 131
 ) -> primp.AsyncClient:
-    session = primp.AsyncClient(impersonate="chrome_131", verify=skip_ssl_verification)
+    session = primp.AsyncClient(
+        impersonate=f"chrome_{chrome_version}", verify=skip_ssl_verification
+    )
 
     if proxy:
         session.proxy = proxy
@@ -34,8 +37,9 @@ HEADERS = {
 import secrets
 
 
-async def create_twitter_client(proxy: str, auth_token: str) -> primp.AsyncClient:
-    session = primp.AsyncClient(impersonate="chrome_131")
+async def create_twitter_client(proxy: str, auth_token: str) -> Session:
+    session = Session(client=Client.CHROME_131)
+    session.random_tls_extension_order = True
 
     if proxy:
         session.proxies.update(
@@ -62,7 +66,7 @@ async def create_twitter_client(proxy: str, auth_token: str) -> primp.AsyncClien
     return session
 
 
-def get_headers(session: primp.AsyncClient, **kwargs) -> dict:
+def get_headers(session: Session, **kwargs) -> dict:
     """
     Get the headers required for authenticated requests
     """
