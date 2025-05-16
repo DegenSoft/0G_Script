@@ -8,4 +8,5 @@ test.py
 app.log
 /data/profiles
 src/version.txt
+.DS_store
 data/proxies.txt

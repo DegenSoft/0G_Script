@@ -17,7 +17,7 @@ tqdm==4.67.1
 urllib3==2.3.0
 uvicorn==0.34.0
 web3==7.8.0
-crypto==1.4.1
 ccxt==4.3.48
+crypto==1.4.1
 aiosqlite
 noble_tls

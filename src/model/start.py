@@ -6,6 +6,7 @@ import asyncio
 
 from src.degensoft.decryption import decrypt_private_key
 from src.model.projects.swaps.zero_exchange.instance import zero_exchange_swaps
+from src.degensoft.decryption import decrypt_private_key
 from src.model.projects.others.puzzlemania.instance import Puzzlemania
 from src.model.projects.deploy import memebridge_deploy, mintair_deploy, easynode_deploy
 from src.model.projects.mints import mintaura_panda, mint_nerzo_0gog
@@ -14,11 +15,15 @@ from src.model.help.stats import WalletStats
 from src.model.offchain.cex.instance import CexWithdraw
 from src.model.projects.crustyswap.instance import CrustySwap
 from src.model.ZeroG import faucets, faucet_tokens, deploy_storage_scan, swaps
+from src.model.offchain.cex.instance import CexWithdraw
+from src.model.projects.crustyswap.instance import CrustySwap
+from src.model.ZeroG import faucets, faucet_tokens, deploy_storage_scan, swaps
 from src.model.onchain.web3_custom import Web3Custom
 from src.utils.client import create_client
 from src.utils.config import Config
 from src.model.database.db_manager import Database
 from src.utils.telegram_logger import send_telegram_message
+from src.utils.reader import read_private_keys
 from src.utils.reader import read_private_keys
 
 class Start:
@@ -225,6 +230,7 @@ class Start:
                     self.wallet,
                     self.proxy,
                     self.twitter_token,
+                    self.twitter_token,
                 )
 
             if task == "faucet_tokens":
@@ -340,6 +346,40 @@ class Start:
                     self.config,
                 )
                 return await cex_withdrawal.withdraw()
+            if task == "crusty_refuel":
+                crusty_swap = CrustySwap(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                    self.proxy,
+                    self.private_key,
+                )
+                return await crusty_swap.refuel()
+        
+            if task == "crusty_refuel_from_one_to_all":
+                private_keys = read_private_keys("data/private_keys.txt")
+
+                crusty_swap = CrustySwap(
+                    1,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    Account.from_key(private_keys[0]),
+                    self.proxy,
+                    private_keys[0],
+                )
+                private_keys = private_keys[1:]
+                return await crusty_swap.refuel_from_one_to_all(private_keys)
+            
+            if task == "cex_withdrawal":
+                cex_withdrawal = CexWithdraw(
+                    self.account_index,
+                    self.private_key,
+                    self.config,
+                )
+                return await cex_withdrawal.withdraw()
             
             if task == "puzzlemania":
                 puzzlemania = Puzzlemania(
@@ -353,6 +393,16 @@ class Start:
                     self.twitter_token,
                 )
                 return await puzzlemania.process()
+
+            if task == "zero_exchange_swaps":
+                return await zero_exchange_swaps(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+            
 
             if task == "zero_exchange_swaps":
                 return await zero_exchange_swaps(
