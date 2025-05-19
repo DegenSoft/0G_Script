@@ -28,7 +28,7 @@ class InvalidKeyError(Exception):
     pass
 
 
-def read_private_keys(file_path: str) -> list:
+def read_private_keys(file_path: str) -> list[str]:
     """
     Read private keys or mnemonic phrases from a file and return a list of private keys.
     If a line contains a mnemonic phrase, it will be converted to a private key.

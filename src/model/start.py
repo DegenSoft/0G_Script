@@ -231,7 +231,6 @@ class Start:
                     self.wallet,
                     self.proxy,
                     self.twitter_token,
-                    self.twitter_token,
                 )
 
             if task == "faucet_tokens":
@@ -327,52 +326,22 @@ class Start:
         
             if task == "crusty_refuel_from_one_to_all":
                 private_keys = read_private_keys("data/private_keys.txt")
+                pks = []
+                for key in private_keys:
+                    pk = decrypt_private_key(key, self.password) if self.password else key
+                    pks.append(pk)
 
                 crusty_swap = CrustySwap(
                     1,
                     self.session,
                     self.zerog_web3,
                     self.config,
-                    Account.from_key(private_keys[0]),
+                    Account.from_key(pks[0]),
                     self.proxy,
-                    private_keys[0],
+                    pks[0],
                 )
-                private_keys = private_keys[1:]
-                return await crusty_swap.refuel_from_one_to_all(private_keys)
-            
-            if task == "cex_withdrawal":
-                cex_withdrawal = CexWithdraw(
-                    self.account_index,
-                    self.private_key,
-                    self.config,
-                )
-                return await cex_withdrawal.withdraw()
-            if task == "crusty_refuel":
-                crusty_swap = CrustySwap(
-                    self.account_index,
-                    self.session,
-                    self.zerog_web3,
-                    self.config,
-                    self.wallet,
-                    self.proxy,
-                    self.private_key,
-                )
-                return await crusty_swap.refuel()
-        
-            if task == "crusty_refuel_from_one_to_all":
-                private_keys = read_private_keys("data/private_keys.txt")
-
-                crusty_swap = CrustySwap(
-                    1,
-                    self.session,
-                    self.zerog_web3,
-                    self.config,
-                    Account.from_key(private_keys[0]),
-                    self.proxy,
-                    private_keys[0],
-                )
-                private_keys = private_keys[1:]
-                return await crusty_swap.refuel_from_one_to_all(private_keys)
+                pks = pks[1:]
+                return await crusty_swap.refuel_from_one_to_all(pks)
             
             if task == "cex_withdrawal":
                 cex_withdrawal = CexWithdraw(
