@@ -5,6 +5,7 @@ from .constants import EXPLORER_URL_0G
 from .statistics import print_wallets_stats
 from .proxy_parser import Proxy
 from .config_browser import run
+from .check_github_version import check_version
 
 __all__ = [
     "create_client",
@@ -18,4 +19,5 @@ __all__ = [
     "run",
     "get_config",
     "EXPLORER_URL_0G",
+    "check_version",
 ]

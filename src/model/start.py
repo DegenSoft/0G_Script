@@ -5,6 +5,7 @@ import random
 import asyncio
 
 from src.degensoft.decryption import decrypt_private_key
+from src.model.projects.mints.omnihub import OmniHub
 from src.model.projects.swaps.zero_exchange.instance import zero_exchange_swaps
 from src.degensoft.decryption import decrypt_private_key
 from src.model.projects.others.puzzlemania.instance import Puzzlemania
@@ -402,6 +403,16 @@ class Start:
                     self.config,
                     self.wallet,
                 )
+
+            if task == "omnihub":
+                instance = OmniHub(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+                return await instance.mint()
             
 
             if task == "zero_exchange_swaps":
@@ -412,6 +423,16 @@ class Start:
                     self.config,
                     self.wallet,
                 )
+
+            if task == "omnihub":
+                instance = OmniHub(
+                    self.account_index,
+                    self.session,
+                    self.zerog_web3,
+                    self.config,
+                    self.wallet,
+                )
+                return await instance.mint()
             
             logger.error(f"{self.account_index} | Task {task} not found")
             return False
